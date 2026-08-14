@@ -1,5 +1,5 @@
 [task]
-name        = "swarmbench/a7f3c9e2b1d84f6a0e5c7b2d9f1a3e8c-SWARMBENCH-HIERARCHICAL-SBOM-AUDIT"
+name        = "swarmbench/a7f3c9e2b1d84f6a0e5c7b2d9f1a3e8c-SWARMBENCH-SBOM-AUDIT"
 description = "Audit all public repositories in the Government of Canada GitHub organisation against 6 supply chain security standards and produce a compliance spreadsheet, four presentation charts, and a senior management briefing note"
 
 verifier_type            = "executable"
