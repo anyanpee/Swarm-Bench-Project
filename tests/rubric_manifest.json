@@ -1,0 +1,319 @@
+{
+  "rubric_version": "1.0",
+  "task_id": "a7f3c9e2b1d84f6a0e5c7b2d9f1a3e8c-SWARMBENCH-HIERARCHICAL-SBOM-AUDIT",
+  "score_components": [
+    "static_check_score",
+    "content_grounding_score",
+    "cross_artifact_consistency_score",
+    "reward_hacking_resistance_score"
+  ],
+  "final_reward_formula": "mean(static_check_score, content_grounding_score, cross_artifact_consistency_score, reward_hacking_resistance_score)",
+  "checks": [
+    {
+      "id": "static_checks_1",
+      "category": "static",
+      "weight": 1,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_csv_exists_and_parses",
+      "detailed_explanation_of_checks": "Verifies that /logs/agent/compliance_matrix.csv exists on disk and can be parsed by Python's csv.DictReader without raising an exception. A missing or malformed CSV means all downstream checks fail.",
+      "how_it_prevents_task_authenticity_violation": "Ensures the agent produced a real structured file rather than an empty placeholder or binary garbage."
+    },
+    {
+      "id": "static_checks_2",
+      "category": "static",
+      "weight": 1,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_csv_has_required_columns",
+      "detailed_explanation_of_checks": "Reads the CSV header row and asserts that all 22 required columns are present with exact names: repo_name, repo_url, primary_language, sbom_exists, sbom_format, dependency_manifest_exists, readme_exists, licence, security_policy, contributing_guide, has_dependency_scanning_in_ci, has_tests_in_ci, dependency_update_policy, last_commit_date, days_since_last_commit, maintained, open_issues_count, open_dependabot_prs, vulnerabilities_known, standards_met, compliance_status, gaps.",
+      "how_it_prevents_task_authenticity_violation": "Prevents agents from omitting inconvenient columns (e.g., gaps or vulnerabilities_known) that would hide non-compliance."
+    },
+    {
+      "id": "static_checks_3",
+      "category": "static",
+      "weight": 2,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_csv_row_count",
+      "detailed_explanation_of_checks": "Counts data rows in the CSV (excluding header). Calls the GitHub API GET /orgs/canada-ca/repos?type=public&per_page=100 with pagination to obtain the ground-truth public repo count at verification time, then asserts the CSV row count equals that number (±2 to allow for repos created or deleted during the audit window).",
+      "how_it_prevents_task_authenticity_violation": "Prevents agents from auditing only a subset of repositories and presenting partial results as complete."
+    },
+    {
+      "id": "static_checks_4",
+      "category": "static",
+      "weight": 1,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_allowed_values",
+      "detailed_explanation_of_checks": "For every row, checks that enum columns contain only their allowed values: sbom_exists in {Yes,No,Unknown}, sbom_format in {SPDX,CycloneDX,Unknown,None}, dependency_manifest_exists in {Yes,No,Unknown}, readme_exists in {Yes,No,Unknown}, security_policy in {Present,Incomplete,Missing,Unknown}, contributing_guide in {Yes,No,Unknown}, has_dependency_scanning_in_ci in {Yes,No,No CI,Unknown}, has_tests_in_ci in {Yes,No,No CI,Unknown}, dependency_update_policy in {Automated,Manual,None,Unknown}, maintained in {Yes,No,Unknown}, compliance_status in {Full,Partial,Non-compliant}.",
+      "how_it_prevents_task_authenticity_violation": "Prevents free-text hallucinations in controlled-vocabulary columns."
+    },
+    {
+      "id": "static_checks_5",
+      "category": "static",
+      "weight": 1,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_standards_met_range",
+      "detailed_explanation_of_checks": "Asserts that every value in the standards_met column is an integer between 0 and 6 inclusive.",
+      "how_it_prevents_task_authenticity_violation": "Catches arithmetic errors or fabricated scores outside the valid range."
+    },
+    {
+      "id": "static_checks_6",
+      "category": "static",
+      "weight": 1,
+      "agent_output_path": "/logs/agent/chart_compliance_split.png",
+      "check_function": "check_chart_compliance_split_exists",
+      "detailed_explanation_of_checks": "Asserts that /logs/agent/chart_compliance_split.png exists and is a valid PNG file (checks magic bytes \\x89PNG).",
+      "how_it_prevents_task_authenticity_violation": "Ensures the agent produced a real image file rather than an empty or renamed text file."
+    },
+    {
+      "id": "static_checks_7",
+      "category": "static",
+      "weight": 1,
+      "agent_output_path": "/logs/agent/chart_standards_pass_rate.png",
+      "check_function": "check_chart_standards_pass_rate_exists",
+      "detailed_explanation_of_checks": "Asserts that /logs/agent/chart_standards_pass_rate.png exists and is a valid PNG file.",
+      "how_it_prevents_task_authenticity_violation": "Ensures the standards pass-rate chart was actually generated."
+    },
+    {
+      "id": "static_checks_8",
+      "category": "static",
+      "weight": 1,
+      "agent_output_path": "/logs/agent/chart_worst_repos.png",
+      "check_function": "check_chart_worst_repos_exists",
+      "detailed_explanation_of_checks": "Asserts that /logs/agent/chart_worst_repos.png exists and is a valid PNG file.",
+      "how_it_prevents_task_authenticity_violation": "Ensures the worst-repos chart was actually generated."
+    },
+    {
+      "id": "static_checks_9",
+      "category": "static",
+      "weight": 1,
+      "agent_output_path": "/logs/agent/chart_commit_staleness.png",
+      "check_function": "check_chart_commit_staleness_exists",
+      "detailed_explanation_of_checks": "Asserts that /logs/agent/chart_commit_staleness.png exists and is a valid PNG file.",
+      "how_it_prevents_task_authenticity_violation": "Ensures the commit-staleness histogram was actually generated."
+    },
+    {
+      "id": "static_checks_10",
+      "category": "static",
+      "weight": 1,
+      "agent_output_path": "/logs/agent/output.json",
+      "check_function": "check_output_json_exists_and_parses",
+      "detailed_explanation_of_checks": "Asserts that /logs/agent/output.json exists and can be parsed by json.loads without error.",
+      "how_it_prevents_task_authenticity_violation": "Ensures the briefing note file is a real JSON document."
+    },
+    {
+      "id": "static_checks_11",
+      "category": "static",
+      "weight": 1,
+      "agent_output_path": "/logs/agent/output.json",
+      "check_function": "check_output_json_required_fields",
+      "detailed_explanation_of_checks": "Asserts that output.json contains all required top-level keys: total_repos_audited, fully_compliant, partially_compliant, non_compliant, most_common_gap, highest_risk_repos, briefing_note. Also asserts that highest_risk_repos is a non-empty list and briefing_note is a non-empty string.",
+      "how_it_prevents_task_authenticity_violation": "Prevents agents from producing a structurally incomplete briefing note."
+    },
+    {
+      "id": "partial_oracle_checks_1",
+      "category": "content_grounding",
+      "weight": 3,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_spot_repo_names_and_urls",
+      "detailed_explanation_of_checks": "Fetches the live list of public repos from GET /orgs/canada-ca/repos?type=public&per_page=100 (paginated). Selects 15 repos at random. For each, asserts that the CSV contains a row with the exact repo_name and the correct repo_url (https://github.com/canada-ca/<name>).",
+      "how_it_prevents_task_authenticity_violation": "Catches agents that fabricate repository names or URLs instead of fetching them from GitHub."
+    },
+    {
+      "id": "partial_oracle_checks_2",
+      "category": "content_grounding",
+      "weight": 3,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_spot_primary_language",
+      "detailed_explanation_of_checks": "For the same 15 spot-check repos, calls GET /repos/canada-ca/<name> and reads the 'language' field. Asserts the CSV primary_language matches (case-insensitive), or both are null/Unknown.",
+      "how_it_prevents_task_authenticity_violation": "Prevents fabrication of programming language values."
+    },
+    {
+      "id": "partial_oracle_checks_3",
+      "category": "content_grounding",
+      "weight": 4,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_spot_licence",
+      "detailed_explanation_of_checks": "For the 15 spot-check repos, fetches the raw content of LICENSE / LICENSE.md / LICENCE from the GitHub Contents API. Extracts the SPDX identifier using keyword matching (MIT, Apache-2.0, GPL-2.0, GPL-3.0, OGL-Canada-2.0, etc.). Asserts the CSV licence field matches the extracted identifier, or both are Unknown.",
+      "how_it_prevents_task_authenticity_violation": "Prevents agents from guessing or fabricating licence identifiers without reading the actual file."
+    },
+    {
+      "id": "partial_oracle_checks_4",
+      "category": "content_grounding",
+      "weight": 4,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_spot_security_policy",
+      "detailed_explanation_of_checks": "For the 15 spot-check repos, checks for SECURITY.md in root, .github/, and docs/ via the Contents API. If found, reads the file and applies the same substantive-content heuristic (length > 200 chars and contains at least one of: 'report', 'vulnerability', 'disclose', 'contact', 'email'). Asserts the CSV security_policy value (Present/Incomplete/Missing) matches the verifier's independent judgment.",
+      "how_it_prevents_task_authenticity_violation": "Prevents agents from marking all repos as Present or Missing without reading the actual file content."
+    },
+    {
+      "id": "partial_oracle_checks_5",
+      "category": "content_grounding",
+      "weight": 3,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_spot_contributing_guide",
+      "detailed_explanation_of_checks": "For the 15 spot-check repos, checks for CONTRIBUTING.md or CONTRIBUTING in root and .github/ via the Contents API. Asserts the CSV contributing_guide value (Yes/No) matches the verifier's finding.",
+      "how_it_prevents_task_authenticity_violation": "Prevents fabrication of contributing guide presence."
+    },
+    {
+      "id": "partial_oracle_checks_6",
+      "category": "content_grounding",
+      "weight": 4,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_spot_last_commit_date",
+      "detailed_explanation_of_checks": "For the 15 spot-check repos, calls GET /repos/canada-ca/<name>/commits?per_page=1 and reads the committer date. Asserts the CSV last_commit_date matches within ±1 day (to allow for timezone differences).",
+      "how_it_prevents_task_authenticity_violation": "Prevents fabrication of commit dates, which directly affects the maintained standard."
+    },
+    {
+      "id": "partial_oracle_checks_7",
+      "category": "content_grounding",
+      "weight": 2,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_spot_maintained_derived",
+      "detailed_explanation_of_checks": "For the 15 spot-check repos, recomputes maintained from the verified last_commit_date (Yes if days_since_last_commit <= 365, No otherwise). Asserts the CSV maintained value matches.",
+      "how_it_prevents_task_authenticity_violation": "Ensures the derived maintained field is correctly computed from the raw date, not independently fabricated."
+    },
+    {
+      "id": "partial_oracle_checks_8",
+      "category": "content_grounding",
+      "weight": 2,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_spot_open_issues_count",
+      "detailed_explanation_of_checks": "For the 15 spot-check repos, calls GET /repos/canada-ca/<name> and reads open_issues_count, then calls GET /repos/canada-ca/<name>/pulls?state=open&per_page=1 with Link header parsing to get PR count. Asserts CSV open_issues_count equals (API open_issues_count - PR count), within ±3 to allow for race conditions.",
+      "how_it_prevents_task_authenticity_violation": "Ensures issue counts exclude pull requests as required by the task contract."
+    },
+    {
+      "id": "partial_oracle_checks_9",
+      "category": "content_grounding",
+      "weight": 3,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_spot_sbom_exists",
+      "detailed_explanation_of_checks": "For the 15 spot-check repos, checks for SBOM files (bom.json, bom.xml, sbom.spdx.json, cyclonedx.json, sbom.json, sbom.xml) in root, .github/, and docs/ via the Contents API. Also checks for dependency manifests (package-lock.json, yarn.lock, poetry.lock, Pipfile.lock, go.sum, Gemfile.lock, Cargo.lock, requirements.txt, pom.xml) in root. Asserts CSV sbom_exists and dependency_manifest_exists match.",
+      "how_it_prevents_task_authenticity_violation": "Prevents fabrication of SBOM presence, which is the primary standard being audited."
+    },
+    {
+      "id": "partial_oracle_checks_10",
+      "category": "content_grounding",
+      "weight": 3,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_spot_dependency_scanning_in_ci",
+      "detailed_explanation_of_checks": "For the 15 spot-check repos, fetches the .github/workflows/ directory listing and reads each workflow YAML file. Searches for dependency-scanning keywords: npm audit, pip-audit, safety, snyk, trivy, grype, owasp-dependency-check, dependency-review. Asserts CSV has_dependency_scanning_in_ci matches (Yes if any keyword found, No CI if no workflows directory, No otherwise).",
+      "how_it_prevents_task_authenticity_violation": "Prevents agents from marking repos as having CI dependency scanning without reading the actual workflow files."
+    },
+    {
+      "id": "partial_oracle_checks_11",
+      "category": "content_grounding",
+      "weight": 2,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_spot_open_dependabot_prs",
+      "detailed_explanation_of_checks": "For the 15 spot-check repos, calls GET /repos/canada-ca/<name>/pulls?state=open&per_page=100 and counts PRs where the user login is 'dependabot[bot]' or the head ref starts with 'dependabot/'. Asserts CSV open_dependabot_prs matches within ±2.",
+      "how_it_prevents_task_authenticity_violation": "Prevents fabrication of Dependabot PR counts."
+    },
+    {
+      "id": "partial_oracle_checks_12",
+      "category": "content_grounding",
+      "weight": 3,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_spot_standards_met_computation",
+      "detailed_explanation_of_checks": "For the 15 spot-check repos, independently recomputes standards_met from the CSV field values using the formula in instruction.md: S1=(sbom_exists==Yes OR dependency_manifest_exists==Yes), S2=(licence!=Unknown), S3=(security_policy==Present), S4=(contributing_guide==Yes), S5=(maintained==Yes), S6=(has_dependency_scanning_in_ci==Yes). Asserts CSV standards_met equals the recomputed value.",
+      "how_it_prevents_task_authenticity_violation": "Ensures standards_met is derived from the actual field values, not independently fabricated."
+    },
+    {
+      "id": "partial_oracle_checks_13",
+      "category": "content_grounding",
+      "weight": 2,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_spot_compliance_status_computation",
+      "detailed_explanation_of_checks": "For all rows, recomputes compliance_status from standards_met: Full if ==6, Partial if 2-5, Non-compliant if 0-1. Asserts CSV compliance_status matches for every row.",
+      "how_it_prevents_task_authenticity_violation": "Ensures the compliance tier is correctly derived from standards_met."
+    },
+    {
+      "id": "partial_oracle_checks_14",
+      "category": "content_grounding",
+      "weight": 2,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_spot_gaps_computation",
+      "detailed_explanation_of_checks": "For the 15 spot-check repos, recomputes the gaps list from the field values and asserts it matches the CSV gaps column (order-insensitive, semicolon-separated). A repo with standards_met==6 must have gaps=='None'.",
+      "how_it_prevents_task_authenticity_violation": "Ensures the gaps column accurately reflects which standards are failing."
+    },
+    {
+      "id": "partial_oracle_checks_15",
+      "category": "content_grounding",
+      "weight": 2,
+      "agent_output_path": "/logs/agent/output.json",
+      "check_function": "check_output_json_counts_match_csv",
+      "detailed_explanation_of_checks": "Reads the CSV and counts Full, Partial, Non-compliant rows. Asserts output.json fully_compliant, partially_compliant, non_compliant, and total_repos_audited match the CSV counts exactly.",
+      "how_it_prevents_task_authenticity_violation": "Ensures the briefing note statistics are derived from the actual CSV data."
+    },
+    {
+      "id": "reward_hacking_checks_1",
+      "category": "reward_hacking",
+      "weight": 2,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_no_duplicate_rows",
+      "detailed_explanation_of_checks": "Asserts that no two rows in the CSV have the same repo_name. Duplicate rows would inflate the row count without doing additional work.",
+      "how_it_prevents_task_authenticity_violation": "Prevents padding the CSV with duplicate entries to satisfy the row-count check."
+    },
+    {
+      "id": "reward_hacking_checks_2",
+      "category": "reward_hacking",
+      "weight": 2,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_unknown_rate_per_row",
+      "detailed_explanation_of_checks": "For each row, counts the number of fields containing 'Unknown'. Asserts that no more than 30% of rows have more than 8 Unknown values out of 22 columns (>36%). A high Unknown rate across many rows indicates the agent gave up on data collection rather than fetching real values.",
+      "how_it_prevents_task_authenticity_violation": "Prevents agents from filling the CSV with Unknown values to avoid making API calls."
+    },
+    {
+      "id": "reward_hacking_checks_3",
+      "category": "reward_hacking",
+      "weight": 2,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_no_uniform_compliance_status",
+      "detailed_explanation_of_checks": "Asserts that not more than 90% of rows share the same compliance_status value. A real audit of 74 diverse repos will produce a distribution across Full, Partial, and Non-compliant.",
+      "how_it_prevents_task_authenticity_violation": "Prevents agents from marking all repos as Full or all as Non-compliant without doing real checks."
+    },
+    {
+      "id": "reward_hacking_checks_4",
+      "category": "reward_hacking",
+      "weight": 2,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_no_full_compliance_without_evidence",
+      "detailed_explanation_of_checks": "For any row where compliance_status=='Full', asserts that sbom_exists=='Yes' OR dependency_manifest_exists=='Yes', licence!='Unknown', security_policy=='Present', contributing_guide=='Yes', maintained=='Yes', and has_dependency_scanning_in_ci=='Yes'. A Full row with contradictory field values indicates fabrication.",
+      "how_it_prevents_task_authenticity_violation": "Prevents agents from marking repos as fully compliant while leaving evidence fields as Unknown or No."
+    },
+    {
+      "id": "reward_hacking_checks_5",
+      "category": "reward_hacking",
+      "weight": 2,
+      "agent_output_path": "/logs/agent/compliance_matrix.csv",
+      "check_function": "check_no_near_duplicate_gaps",
+      "detailed_explanation_of_checks": "Computes the gaps string for every row. Asserts that fewer than 70% of rows with standards_met < 6 share the exact same gaps string. Identical gaps across all non-compliant repos would indicate the agent applied a single template rather than evaluating each repo individually.",
+      "how_it_prevents_task_authenticity_violation": "Prevents boilerplate gap lists that don't reflect per-repo reality."
+    },
+    {
+      "id": "reward_hacking_checks_6",
+      "category": "reward_hacking",
+      "weight": 2,
+      "agent_output_path": "/logs/agent/output.json",
+      "check_function": "check_briefing_note_names_specific_repos",
+      "detailed_explanation_of_checks": "Reads the briefing_note string from output.json. Asserts that at least 3 distinct repository names (from the CSV repo_name column) appear verbatim in the briefing note text.",
+      "how_it_prevents_task_authenticity_violation": "Prevents generic boilerplate briefing notes that don't reference the actual audit findings."
+    },
+    {
+      "id": "reward_hacking_checks_7",
+      "category": "reward_hacking",
+      "weight": 1,
+      "agent_output_path": "/logs/agent/output.json",
+      "check_function": "check_briefing_note_length",
+      "detailed_explanation_of_checks": "Asserts that the briefing_note string is at least 300 words and no more than 800 words, consistent with 2–3 substantive paragraphs.",
+      "how_it_prevents_task_authenticity_violation": "Prevents one-sentence placeholder briefing notes."
+    },
+    {
+      "id": "reward_hacking_checks_8",
+      "category": "reward_hacking",
+      "weight": 1,
+      "agent_output_path": "/logs/agent/output.json",
+      "check_function": "check_highest_risk_repos_are_real",
+      "detailed_explanation_of_checks": "Reads highest_risk_repos from output.json. Asserts that every repo name listed exists in the CSV repo_name column and that each entry has a non-empty reason string of at least 20 characters.",
+      "how_it_prevents_task_authenticity_violation": "Prevents fabricated or generic risk repo lists."
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+[task]
+name        = "swarmbench/a7f3c9e2b1d84f6a0e5c7b2d9f1a3e8c-SWARMBENCH-HIERARCHICAL-SBOM-AUDIT"
+description = "Audit all public repositories in the Government of Canada GitHub organisation against 6 supply chain security standards and produce a compliance spreadsheet, four presentation charts, and a senior management briefing note"
+
+verifier_type            = "executable"
+domain                   = "code-swe"
+coordination_pattern     = "hierarchical"
+secondary_classification = ["browsing", "multi_modal"]
+
+dag_depth  = 4
+dag_width  = 148
+
+human_solving_hours_estimate       = 28.0
+human_solving_hours_justification  = """
+A human analyst would need to: (1) manually enumerate all public repositories in the canada-ca
+organisation by paginating the GitHub web UI or API (~1 hour); (2) for each of the ~74 repos,
+open the repository, check for the presence of SBOM/manifest files, LICENSE, SECURITY.md,
+CONTRIBUTING.md, and CI workflow files, read file contents to judge quality vs. placeholder,
+and record last-commit dates — averaging ~15 minutes per repo × 74 repos = ~18.5 hours;
+(3) query the GitHub API for open issues, Dependabot PRs, and known vulnerabilities for each
+repo (~5 minutes per repo × 74 = ~6 hours); (4) compile all data into a structured CSV,
+validate allowed values, and compute derived columns (~1.5 hours); (5) produce four
+publication-quality charts in a spreadsheet or Python (~1 hour); and (6) draft a 2–3 paragraph
+senior management briefing note with specific repo names and recommendations (~0.5 hours).
+Total: approximately 28 hours of focused analyst work.
+"""
+
+estimated_sub_agents  = 226
+input_token_estimate  = 550000
+reference_link        = "https://github.com/canada-ca"
+
+why_multi_agent = """
+A single agent attempting this task serially would exhaust the GitHub unauthenticated REST API
+rate limit (60 requests/hour) after roughly the first 10–12 repositories, because each repo
+requires 6–10 API calls (repo metadata, contents listing for root/.github/docs, each file read,
+workflow directory listing, PR listing). With ~74 repos × ~8 calls = ~592 requests, a single
+agent would stall for hours waiting for rate-limit resets, and is prone to degenerate retry
+loops that consume the entire timeout budget without producing output.
+
+The hierarchical design resolves this by: (1) the orchestrator performing a single paginated
+discovery pass to enumerate all repos; (2) spawning one manager sub-agent per repository
+concurrently (~74 managers), each operating within its own rate-limit window and using
+conditional requests (ETags) to minimise quota consumption; (3) each manager spawning two
+parallel workers — one for metadata API calls and one for file-content reads — so the two
+heaviest call categories are parallelised within each repo; (4) the orchestrator reducer
+combining all per-repo JSON files into the final CSV and charts only after all managers
+complete, ensuring no partial output is published. This design reduces wall-clock time from
+hours to minutes and eliminates the single-agent rate-limit bottleneck entirely.
+"""
+
+[agent]
+timeout_sec = 420
+
+[verifier]
+timeout_sec = 1800
+
+[environment]
+cpus              = 2
+memory_mb         = 4096
+build_timeout_sec = 600

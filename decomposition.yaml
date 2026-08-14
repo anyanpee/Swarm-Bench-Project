@@ -1,0 +1,111 @@
+version: "1.0"
+description: >
+  Three-stage hierarchical decomposition for the canada-ca SBOM compliance audit.
+  Stage 1 discovers all public repositories. Stage 2 fans out one manager per repo,
+  each managing two parallel workers. Stage 3 reduces all per-repo JSON files into
+  the final CSV, charts, and briefing note.
+
+stages:
+
+  - id: discover-repos
+    parallel_group: null
+    depends_on: []
+    agent_type: orchestrator
+    description: >
+      Browse https://github.com/orgs/canada-ca/repositories?type=public and paginate
+      through all pages until no further repositories are listed. For each repository
+      record: name, full HTTPS URL, default branch, and archived status. Filter out
+      archived repositories. Write the complete list as a JSON array to
+      /workspace/all_repos.json. No sub-agents are spawned in this stage — the
+      orchestrator performs all discovery itself using the GitHub REST API
+      (GET /orgs/canada-ca/repos?type=public&per_page=100) with Link-header pagination.
+    outputs:
+      - /workspace/all_repos.json
+    retry_policy:
+      max_attempts: 3
+      backoff_seconds: 10
+
+  - id: repo-audit-fanout
+    parallel_group: repo-managers
+    depends_on: [discover-repos]
+    agent_type: manager
+    description: >
+      Read /workspace/all_repos.json. For EVERY repository in the list, spawn exactly
+      one manager sub-agent (agent_type: general). All managers are spawned concurrently
+      in a single batch — do not spawn them sequentially. Each manager is responsible
+      for exactly one repository and must:
+
+        1. Spawn Worker A (agent_type: explore) — metadata facts:
+             - Primary language (GitHub API repo object)
+             - readme_exists (check root for README.md / README.rst / README)
+             - last_commit_date and days_since_last_commit (commits API, default branch)
+             - open_issues_count (repo API open_issues_count minus open PR count)
+             - open_dependabot_prs (search PRs with label "dependencies" or author "app/dependabot")
+             - dependency_update_policy (check for .github/dependabot.yml or renovate.json)
+             - has_dependency_scanning_in_ci (read .github/workflows/*.yml for audit keywords)
+             - has_tests_in_ci (read .github/workflows/*.yml for test keywords)
+             - dependency_manifest_exists (check root for package-lock.json, yarn.lock,
+               poetry.lock, Pipfile.lock, go.sum, Gemfile.lock, Cargo.lock, composer.lock,
+               pom.xml, build.gradle, requirements.txt)
+             - sbom_exists and sbom_format (check root, .github/, docs/ for bom.json,
+               bom.xml, sbom.spdx.json, cyclonedx.json, sbom.json, sbom.xml)
+             - vulnerabilities_known (GitHub vulnerability alerts API if accessible)
+
+        2. Spawn Worker B (agent_type: explore) — content judgments:
+             - licence: read LICENSE / LICENSE.md / LICENCE file content, extract SPDX id
+             - security_policy: read SECURITY.md from root, .github/, docs/; judge
+               Present / Incomplete / Missing based on whether it contains substantive
+               disclosure instructions (not a placeholder or <5 lines)
+             - contributing_guide: check for CONTRIBUTING.md or CONTRIBUTING in root
+               and .github/
+
+        3. Wait for both workers to complete.
+        4. If a worker fails or times out, spawn one replacement worker with the same
+           instructions before proceeding.
+        5. Merge both worker results, compute standards_met (0–6) and compliance_status,
+           and build the gaps list.
+        6. Write the merged result as a single JSON object to
+           /workspace/repo_<repo_name>.json where <repo_name> is the exact repository
+           name (no spaces, no path separators).
+
+    per_manager_outputs:
+      pattern: /workspace/repo_<repo_name>.json
+    retry_policy:
+      worker_max_attempts: 2
+      manager_max_attempts: 1
+
+  - id: reducer
+    parallel_group: null
+    depends_on: [repo-audit-fanout]
+    agent_type: orchestrator
+    description: >
+      Read every /workspace/repo_*.json file. Validate that the number of files matches
+      the number of repositories in /workspace/all_repos.json; log a warning for any
+      missing repos and fill their rows with Unknown values. Then:
+
+        1. Combine all rows into /logs/agent/compliance_matrix.csv with the exact column
+           order specified in instruction.md.
+        2. Validate all enum columns against their allowed-value sets; replace any
+           out-of-range value with Unknown and log the correction.
+        3. Recompute standards_met and compliance_status from the final field values to
+           ensure internal consistency.
+        4. Generate the four PNG charts from the CSV data:
+             - chart_compliance_split.png  (pie: Full/Partial/Non-compliant counts)
+             - chart_standards_pass_rate.png (horizontal bar: pass % per standard)
+             - chart_worst_repos.png (horizontal bar: 10 repos with lowest standards_met)
+             - chart_commit_staleness.png (histogram: days_since_last_commit distribution)
+        5. Compute summary statistics and write /logs/agent/output.json containing:
+             total_repos_audited, fully_compliant, partially_compliant, non_compliant,
+             most_common_gap, highest_risk_repos (list with reasons), and briefing_note
+             (2–3 paragraphs naming specific repos, overall compliance rate, top 3 actions).
+        6. No sub-agents are spawned in this stage.
+    outputs:
+      - /logs/agent/compliance_matrix.csv
+      - /logs/agent/chart_compliance_split.png
+      - /logs/agent/chart_standards_pass_rate.png
+      - /logs/agent/chart_worst_repos.png
+      - /logs/agent/chart_commit_staleness.png
+      - /logs/agent/output.json
+    retry_policy:
+      max_attempts: 2
+      backoff_seconds: 5
